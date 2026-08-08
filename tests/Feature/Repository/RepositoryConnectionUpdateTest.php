@@ -100,6 +100,47 @@ class RepositoryConnectionUpdateTest extends TestCase
         Http::assertSent(fn (Request $request) => $request->hasHeader('Authorization', 'Bearer '.self::OLD_TOKEN));
     }
 
+    public function test_a_token_of_only_whitespace_reads_as_leaving_the_field_blank(): void
+    {
+        // Trimming empties the field, and an empty optional field means "keep
+        // the one you hold" — the same as never touching it. Pinned because
+        // it falls out of Laravel skipping non-implicit rules on an empty
+        // value rather than from anything stated here.
+        $this->fakeGitHub();
+        $connection = $this->connected();
+
+        $this->actingAs($connection->project->owner)
+            ->put(route('projects.repository.update', $connection->project), [
+                'repository_url' => 'https://github.com/acme/platform',
+                'token' => '     ',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $fresh = $connection->fresh();
+
+        $this->assertNotNull($fresh);
+        $this->assertSame(self::OLD_TOKEN, $fresh->token);
+
+        Http::assertSent(fn (Request $request) => $request->hasHeader('Authorization', 'Bearer '.self::OLD_TOKEN));
+    }
+
+    public function test_a_token_of_only_whitespace_is_still_refused_when_connecting(): void
+    {
+        // On the connect form the field is required, so the same input is a
+        // missing token rather than an unchanged one.
+        Http::fake();
+        $project = Project::factory()->create();
+
+        $this->actingAs($project->owner)
+            ->post(route('projects.repository.store', $project), [
+                'repository_url' => 'https://github.com/acme/platform',
+                'token' => '     ',
+            ])
+            ->assertSessionHasErrors('token');
+
+        $this->assertNoGitHubCall();
+    }
+
     public function test_the_owner_can_repoint_the_connection_to_another_repository(): void
     {
         $this->fakeGitHub([

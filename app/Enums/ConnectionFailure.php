@@ -47,6 +47,13 @@ enum ConnectionFailure: string
             self::RepositoryNotFound => 'repository_url',
             self::RateLimited,
             self::GithubUnavailable,
+            /*
+             * Unreachable today: `IdentityChanged` is only ever produced by
+             * re-verification, which records a status instead of raising a
+             * validation error. Mapped anyway rather than left to fall
+             * through, so that surfacing it on a form later is a one-line
+             * change and not a missing case.
+             */
             self::IdentityChanged => 'github',
         };
     }
