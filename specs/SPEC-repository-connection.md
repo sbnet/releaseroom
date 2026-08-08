@@ -1,7 +1,7 @@
 ---
 ref: repository-connection
 title: "GitHub repository connection"
-status: validated
+status: implemented
 issue: 3
 date: 2026-08-08
 ---
