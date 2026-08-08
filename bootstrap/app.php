@@ -24,6 +24,17 @@ return Application::configure(basePath: dirname(__DIR__))
         ]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
+        /*
+         * A validation error flashes the submitted input back into the
+         * session. Third-party credentials must never make that round trip.
+         */
+        $exceptions->dontFlash([
+            'current_password',
+            'password',
+            'password_confirmation',
+            'token',
+        ]);
+
         $exceptions->shouldRenderJsonWhen(
             fn (Request $request) => $request->is('api/*') || $request->expectsJson(),
         );

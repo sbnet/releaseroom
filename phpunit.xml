@@ -26,6 +26,12 @@
         <env name="DB_CONNECTION" value="sqlite"/>
         <env name="DB_DATABASE" value=":memory:"/>
         <env name="DB_URL" value=""/>
+        <!--
+            Pinned so the suite asserts against a fixed base URL no matter
+            what a developer pointed their local .env at. Every GitHub call
+            is faked; nothing here is ever dialled.
+        -->
+        <env name="GITHUB_API_URL" value="https://api.github.com"/>
         <env name="MAIL_MAILER" value="array"/>
         <env name="QUEUE_CONNECTION" value="sync"/>
         <env name="SESSION_DRIVER" value="array"/>

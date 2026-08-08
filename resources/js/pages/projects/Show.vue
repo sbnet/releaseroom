@@ -2,12 +2,14 @@
 import { Head, Link } from '@inertiajs/vue3';
 import { computed } from 'vue';
 import Heading from '@/components/Heading.vue';
+import RepositoryConnectionCard from '@/components/RepositoryConnectionCard.vue';
 import { Button } from '@/components/ui/button';
 import { edit, index } from '@/routes/projects';
-import type { Project } from '@/types';
+import type { Project, RepositoryConnection } from '@/types';
 
 const props = defineProps<{
     project: Project;
+    connection: RepositoryConnection | null;
 }>();
 
 defineOptions({
@@ -64,14 +66,19 @@ const createdAt = computed(() =>
             </div>
         </dl>
 
+        <RepositoryConnectionCard
+            :project="props.project"
+            :connection="props.connection"
+        />
+
         <div
             class="flex flex-1 flex-col items-center justify-center gap-2 rounded-xl border border-dashed border-sidebar-border/70 p-12 text-center dark:border-sidebar-border"
         >
             <p class="font-medium">Nothing to publish yet</p>
             <p class="max-w-md text-sm text-muted-foreground">
-                Connecting a GitHub repository and composing releases land in
-                the next slices. For now this project holds its identity and its
-                public address.
+                Composing and publishing releases lands in the next slice. For
+                now this project holds its identity, its public address and
+                where it reads from.
             </p>
         </div>
     </div>
