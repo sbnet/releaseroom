@@ -1,0 +1,39 @@
+name: Spec lifecycle
+
+on:
+  pull_request:
+    types: [closed]
+
+permissions:
+  contents: write
+
+jobs:
+  mark-implemented:
+    if: github.event.pull_request.merged == true
+    runs-on: ubuntu-latest
+    env:
+      PR_BODY: ${{ github.event.pull_request.body }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref }}
+
+      - name: Mark the linked spec as implemented
+        run: |
+          spec=$(grep -oE 'specs/SPEC-[A-Za-z0-9._-]+\.md' <<< "$PR_BODY" | head -1 || true)
+          if [ -z "$spec" ] || [ ! -f "$spec" ]; then
+            echo "No linked spec found, nothing to do."
+            exit 0
+          fi
+          sed -i 's/^status: .*/status: implemented/' "$spec"
+          ref=$(basename "$spec" .md)
+          sed -i "/${ref}/s/| *validated *|/| implemented |/" specs/README.md || true
+          if git diff --quiet; then
+            echo "Spec already up to date."
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add "$spec" specs/README.md
+          git commit -m "docs: mark $(basename "$spec") as implemented"
+          git push

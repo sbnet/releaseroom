@@ -1,0 +1,25 @@
+project:
+  name: releaseroom
+
+forge: github
+
+commands:
+  lint: "vendor/bin/pint --test"
+  lint_fix: "vendor/bin/pint"
+  static: "vendor/bin/phpstan analyse --no-progress --memory-limit=1G"
+  types: "npm run types:check"
+  lint_front: "npm run lint:check"
+  format_front: "npm run format:check"
+  test: "php artisan test"
+  build: "npm run build"
+
+gates:
+  on_edit: [lint]
+  on_push: [lint, static, types, lint_front, format_front, test]
+  on_stop: []
+
+specs:
+  dir: specs/
+
+github:
+  labels: [flux]
