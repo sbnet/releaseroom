@@ -1,7 +1,7 @@
 ---
 ref: projects
 title: "Projects: the unit that owns a changelog"
-status: validated
+status: implemented
 issue: 1
 ---
 
