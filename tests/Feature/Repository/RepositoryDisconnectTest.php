@@ -6,6 +6,7 @@ use App\Models\Project;
 use App\Models\RepositoryConnection;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
 class RepositoryDisconnectTest extends TestCase
@@ -35,7 +36,7 @@ class RepositoryDisconnectTest extends TestCase
         $this->actingAs($project->owner)
             ->get(route('projects.show', $project))
             ->assertOk()
-            ->assertSee('No repository connected yet.', escape: false);
+            ->assertInertia(fn (Assert $page) => $page->where('connection', null));
     }
 
     public function test_disconnecting_without_a_connection_is_not_found(): void

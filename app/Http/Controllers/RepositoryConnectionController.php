@@ -13,6 +13,7 @@ use App\Models\RepositoryConnection;
 use App\Services\GitHub\RepositoryVerifier;
 use App\Support\GitHub\RepositoryReference;
 use App\Support\GitHub\VerifiedRepository;
+use Illuminate\Database\UniqueConstraintViolationException;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Support\Facades\Gate;
 use Illuminate\Validation\ValidationException;
@@ -62,7 +63,7 @@ class RepositoryConnectionController extends Controller
 
         $verified = $this->verify($request->reference(), $token);
 
-        $this->guardAgainstDuplicate($project, $verified);
+        $this->guardAgainstDuplicate($project, $verified->githubId, exceptId: null);
 
         $connection = new RepositoryConnection;
         $connection->project_id = $project->id;
@@ -70,7 +71,7 @@ class RepositoryConnectionController extends Controller
         $connection->setToken($token);
 
         $this->applyVerification($connection, $verified);
-        $connection->save();
+        $this->persist($project, $connection);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Repository connected.')]);
 
@@ -94,14 +95,14 @@ class RepositoryConnectionController extends Controller
 
         $verified = $this->verify($request->reference(), $token);
 
-        $this->guardAgainstDuplicate($project, $verified);
+        $this->guardAgainstDuplicate($project, $verified->githubId, exceptId: $connection->getKey());
 
         if ($submitted !== null) {
             $connection->setToken($submitted);
         }
 
         $this->applyVerification($connection, $verified);
-        $connection->save();
+        $this->persist($project, $connection);
 
         Inertia::flash('toast', ['type' => 'success', 'message' => __('Repository connection updated.')]);
 
@@ -179,22 +180,43 @@ class RepositoryConnectionController extends Controller
     }
 
     /**
+     * Write the connection, treating a lost race as the refusal the checks
+     * above would have raised had they run a moment later.
+     *
+     * The unique indexes are the actual guarantee; the checks only exist to
+     * produce a message worth reading. When two submissions cross — a double
+     * click that outruns the disabled button, two open tabs — the database is
+     * what refuses, and the owner still deserves that message rather than a
+     * 500 after their GitHub quota has already been spent.
+     */
+    private function persist(Project $project, RepositoryConnection $connection): void
+    {
+        try {
+            $connection->save();
+        } catch (UniqueConstraintViolationException) {
+            $this->guardAgainstDuplicate($project, $connection->github_id, exceptId: $connection->getKey());
+
+            throw ValidationException::withMessages([
+                'repository_url' => __('This project already has a repository connected.'),
+            ]);
+        }
+    }
+
+    /**
      * Refuse a repository the owner already reads from another project.
      *
      * Checked on the numeric id rather than the address, so renaming the
      * repository on GitHub does not open a way around it.
      */
-    private function guardAgainstDuplicate(Project $project, VerifiedRepository $verified): void
+    private function guardAgainstDuplicate(Project $project, int $githubId, ?int $exceptId): void
     {
         $query = RepositoryConnection::query()
             ->where('user_id', $project->user_id)
-            ->where('github_id', $verified->githubId)
+            ->where('github_id', $githubId)
             ->with('project');
 
-        $current = $project->repositoryConnection;
-
-        if ($current !== null) {
-            $query->whereKeyNot($current->getKey());
+        if ($exceptId !== null) {
+            $query->whereKeyNot($exceptId);
         }
 
         $duplicate = $query->first();

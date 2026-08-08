@@ -9,6 +9,7 @@ use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\FakesGitHub;
 use Tests\TestCase;
 
@@ -43,7 +44,10 @@ class RepositoryConnectionUpdateTest extends TestCase
         $this->actingAs($connection->project->owner)
             ->get(route('projects.repository.edit', $connection->project))
             ->assertOk()
-            ->assertSee(substr(self::OLD_TOKEN, -4));
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('connection.token_last_four', substr(self::OLD_TOKEN, -4))
+                ->missing('connection.token')
+            );
     }
 
     public function test_the_owner_can_replace_the_token(): void
@@ -67,6 +71,13 @@ class RepositoryConnectionUpdateTest extends TestCase
 
         // The new token, not the old one, is what was put to GitHub.
         Http::assertSent(fn (Request $request) => $request->hasHeader('Authorization', 'Bearer '.self::NEW_TOKEN));
+
+        // And neither token comes back out on the screens that follow.
+        $this->actingAs($connection->project->owner)
+            ->get(route('projects.repository.edit', $connection->project))
+            ->assertOk()
+            ->assertDontSee(self::NEW_TOKEN, escape: false)
+            ->assertDontSee(self::OLD_TOKEN, escape: false);
     }
 
     public function test_a_blank_token_keeps_the_stored_one_and_reverifies_with_it(): void
@@ -128,6 +139,15 @@ class RepositoryConnectionUpdateTest extends TestCase
             ->assertSessionHasErrors([
                 'token' => ConnectionFailure::InvalidToken->message(),
             ]);
+
+        // A refused update must not echo the rejected token back either.
+        $this->assertNull(session()->getOldInput('token'));
+
+        $this->actingAs($connection->project->owner)
+            ->get(route('projects.repository.edit', $connection->project))
+            ->assertOk()
+            ->assertDontSee(self::NEW_TOKEN, escape: false)
+            ->assertDontSee(self::OLD_TOKEN, escape: false);
 
         $fresh = $connection->fresh();
 

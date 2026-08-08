@@ -9,6 +9,7 @@ use App\Models\RepositoryConnection;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\Client\Request;
 use Illuminate\Support\Facades\Http;
+use Inertia\Testing\AssertableInertia as Assert;
 use Tests\Concerns\FakesGitHub;
 use Tests\TestCase;
 
@@ -162,7 +163,29 @@ class RepositoryConnectionCheckTest extends TestCase
         $this->actingAs($connection->project->owner)
             ->get(route('projects.show', $connection->project))
             ->assertOk()
-            ->assertSee(ConnectionFailure::InvalidToken->message(), escape: false);
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('connection.status', 'failed')
+                ->where('connection.error_message', ConnectionFailure::InvalidToken->message())
+            );
+    }
+
+    public function test_a_recheck_never_echoes_the_stored_token(): void
+    {
+        $this->fakeGitHubRepositoryFailure(401);
+        $connection = $this->connected();
+
+        $this->actingAs($connection->project->owner)
+            ->post(route('projects.repository.check', $connection->project));
+
+        $this->actingAs($connection->project->owner)
+            ->get(route('projects.show', $connection->project))
+            ->assertOk()
+            ->assertDontSee(self::TOKEN, escape: false);
+
+        $this->actingAs($connection->project->owner)
+            ->get(route('projects.repository.edit', $connection->project))
+            ->assertOk()
+            ->assertDontSee(self::TOKEN, escape: false);
     }
 
     public function test_checking_a_project_without_a_connection_is_not_found(): void

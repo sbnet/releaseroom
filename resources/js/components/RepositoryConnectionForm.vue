@@ -34,10 +34,17 @@ const action =
 </script>
 
 <template>
+    <!--
+        The token field is cleared whenever the submission is refused. An
+        input left to its own devices keeps its DOM value across the failed
+        round trip, so a rejected token would sit there — revealable through
+        the show/hide toggle — long after it stopped being any use.
+    -->
     <Form
         v-bind="action"
         class="space-y-6"
         :options="{ preserveScroll: true }"
+        :reset-on-error="['token']"
         v-slot="{ errors, processing }"
     >
         <!--
@@ -100,10 +107,10 @@ const action =
                 class="text-sm text-muted-foreground"
                 data-test="token-fingerprint"
             >
-                Current token ends in
-                <span class="font-mono">{{
-                    props.connection.token_last_four
-                }}</span>
+                Current token
+                <span class="font-mono"
+                    >••••{{ props.connection.token_last_four }}</span
+                >
                 <template v-if="props.connection.created_at">
                     , added
                     {{ toLongDate(props.connection.created_at) }}

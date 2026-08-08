@@ -179,9 +179,11 @@ readings.
   manage a project is being allowed to manage its integration. No separate
   policy.
 - A non-owner receives **403** on every route, consistent with SPEC-projects.
-- Write routes (`store`, `update`, `check`) carry `throttle:10,1` per user.
-  The token's GitHub quota is a shared resource and these routes are the only
-  way to spend it from outside.
+- Every write route (`store`, `update`, `check`, `destroy`) carries
+  `throttle:10,1` per user. `store`, `update` and `check` spend the token's
+  GitHub quota, which is a shared resource and reachable only through them.
+  `destroy` spends nothing, but sits under the same limit so that a scripted
+  disconnect/reconnect loop cannot sidestep the others.
 
 ## Routes
 
@@ -243,6 +245,12 @@ One screen, two states.
 - `token` empty, with the placeholder "Leave blank to keep the current
   token", next to the fingerprint `••••abcd`, the date it was added, and the
   expiry date when known.
+- **The token field is emptied whenever the submission is refused**, on both
+  forms. An input left to itself keeps its DOM value across the failed round
+  trip, so a rejected token would stay in the field — and revealable through
+  the show/hide toggle — long after it stopped being any use. The cost is
+  re-pasting after a transient failure such as GitHub being down; keeping a
+  live credential on screen is the worse of the two.
 - Metadata read back: default branch, visibility, last check.
 - A destructive "Disconnect" section at the bottom, behind a confirmation
   dialog in the style of the existing account and project deletion. It states
@@ -264,7 +272,9 @@ as a form-level error, since neither is the user's input being wrong.
 6. A failed update leaves the previous connection exactly as it was.
 7. The token is never sent to the client, in any response, prop or error.
 8. `token` is registered in the framework's "do not flash" list, so a
-   validation error never round-trips it through the session.
+   validation error never round-trips it through the session, and the field
+   is cleared client-side on any refusal so it does not survive in the DOM
+   either.
 
 ## Re-verification
 
@@ -328,8 +338,9 @@ A `failed` connection is a normal, recoverable state, not a broken record.
 
 ## Testing
 
-Every GitHub call is faked (`Http::fake`); no test touches the network. The
-suite covers, at minimum:
+Every GitHub call is faked (`Http::fake`); no test touches the network, and
+`phpunit.xml` pins `GITHUB_API_URL` so the suite is hermetic no matter where
+a developer's local `.env` points. The suite covers, at minimum:
 
 - URL parsing, accepted and rejected forms, as a unit test over the parser.
 - Each row of the failure mapping table, asserting the error code, the target
@@ -347,6 +358,11 @@ suite covers, at minimum:
 - Re-verification: each of the four outcomes, including the rename-follows
   and identity-changed branches.
 - Cascade: deleting the project removes the connection row.
+- The lost race: a competing connection inserted while GitHub is being called
+  slips past the pre-checks, and the unique index refuses the write. The owner
+  gets the validation error the pre-checks would have given, not a 500.
+- Screen payloads are asserted on the Inertia props rather than on rendered
+  markup: the response of a single-page app carries props and nothing else.
 
 ## Acceptance criteria
 
