@@ -1,0 +1,140 @@
+<script setup lang="ts">
+import { Form, Link } from '@inertiajs/vue3';
+import { ExternalLink, GitBranch, Lock, RefreshCw } from '@lucide/vue';
+import { computed } from 'vue';
+import RepositoryConnectionController from '@/actions/App/Http/Controllers/RepositoryConnectionController';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { toRelativeTime } from '@/lib/relativeTime';
+import { edit } from '@/routes/projects/repository';
+import type { Project, RepositoryConnection } from '@/types';
+
+const props = defineProps<{
+    project: Project;
+    connection: RepositoryConnection | null;
+}>();
+
+const lastChecked = computed(() =>
+    props.connection === null
+        ? null
+        : toRelativeTime(props.connection.last_checked_at),
+);
+</script>
+
+<template>
+    <section
+        class="space-y-4 rounded-xl border border-sidebar-border/70 p-4 dark:border-sidebar-border"
+    >
+        <div class="flex items-start justify-between gap-4">
+            <div class="space-y-1">
+                <h2 class="font-medium">Repository</h2>
+                <p class="text-sm text-muted-foreground">
+                    Where this project reads its merged pull requests from.
+                </p>
+            </div>
+
+            <Button
+                v-if="props.connection === null"
+                as-child
+                data-test="connect-repository-button"
+            >
+                <Link :href="edit(props.project.id)">Connect a repository</Link>
+            </Button>
+        </div>
+
+        <p
+            v-if="props.connection === null"
+            class="text-sm text-muted-foreground"
+        >
+            No repository connected yet.
+        </p>
+
+        <template v-else>
+            <div class="flex flex-wrap items-center gap-2">
+                <a
+                    :href="props.connection.url"
+                    target="_blank"
+                    rel="noreferrer noopener"
+                    class="inline-flex items-center gap-1.5 font-mono text-sm hover:underline"
+                    data-test="repository-full-name"
+                >
+                    {{ props.connection.full_name }}
+                    <ExternalLink class="size-3.5 text-muted-foreground" />
+                </a>
+
+                <Badge variant="secondary">
+                    <Lock v-if="props.connection.is_private" />
+                    {{ props.connection.is_private ? 'Private' : 'Public' }}
+                </Badge>
+
+                <Badge
+                    :variant="
+                        props.connection.status === 'connected'
+                            ? 'outline'
+                            : 'destructive'
+                    "
+                    data-test="repository-status"
+                >
+                    {{
+                        props.connection.status === 'connected'
+                            ? 'Connected'
+                            : 'Connection failed'
+                    }}
+                </Badge>
+            </div>
+
+            <p
+                v-if="props.connection.error_message"
+                class="text-sm text-destructive"
+                data-test="repository-error"
+            >
+                {{ props.connection.error_message }}
+            </p>
+
+            <dl class="grid gap-4 text-sm sm:grid-cols-2">
+                <div class="space-y-1">
+                    <dt class="text-muted-foreground">Default branch</dt>
+                    <dd class="inline-flex items-center gap-1.5 font-mono">
+                        <GitBranch class="size-3.5 text-muted-foreground" />
+                        {{ props.connection.default_branch }}
+                    </dd>
+                </div>
+                <div class="space-y-1">
+                    <dt class="text-muted-foreground">Last checked</dt>
+                    <dd>{{ lastChecked }}</dd>
+                </div>
+            </dl>
+
+            <div class="flex items-center gap-2">
+                <Form
+                    v-bind="
+                        RepositoryConnectionController.check.form(
+                            props.project.id,
+                        )
+                    "
+                    :options="{ preserveScroll: true }"
+                    v-slot="{ processing }"
+                >
+                    <Button
+                        type="submit"
+                        variant="outline"
+                        :disabled="processing"
+                        data-test="check-repository-button"
+                    >
+                        <RefreshCw :class="processing ? 'animate-spin' : ''" />
+                        Test connection
+                    </Button>
+                </Form>
+
+                <Button variant="ghost" as-child>
+                    <Link
+                        :href="edit(props.project.id)"
+                        data-test="manage-repository-button"
+                    >
+                        Manage
+                    </Link>
+                </Button>
+            </div>
+        </template>
+    </section>
+</template>

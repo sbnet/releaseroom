@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Concerns\PresentsProjects;
 use App\Http\Requests\ProjectStoreRequest;
 use App\Http\Requests\ProjectUpdateRequest;
 use App\Models\Project;
@@ -14,6 +15,8 @@ use Inertia\Response;
 
 class ProjectController extends Controller
 {
+    use PresentsProjects;
+
     /**
      * List the projects owned by the current user.
      */
@@ -23,7 +26,7 @@ class ProjectController extends Controller
             ->projects()
             ->latest()
             ->get()
-            ->map(fn (Project $project) => $this->toPayload($project))
+            ->map(fn (Project $project) => $this->projectPayload($project))
             ->all();
 
         return Inertia::render('projects/Index', [
@@ -59,7 +62,8 @@ class ProjectController extends Controller
         Gate::authorize('view', $project);
 
         return Inertia::render('projects/Show', [
-            'project' => $this->toPayload($project),
+            'project' => $this->projectPayload($project),
+            'connection' => $this->connectionPayload($project->repositoryConnection),
         ]);
     }
 
@@ -71,7 +75,7 @@ class ProjectController extends Controller
         Gate::authorize('update', $project);
 
         return Inertia::render('projects/Edit', [
-            'project' => $this->toPayload($project),
+            'project' => $this->projectPayload($project),
         ]);
     }
 
@@ -110,21 +114,5 @@ class ProjectController extends Controller
         $user = $request->user();
 
         return $user;
-    }
-
-    /**
-     * Shape a project for the front end.
-     *
-     * @return array<string, mixed>
-     */
-    private function toPayload(Project $project): array
-    {
-        return [
-            'id' => $project->id,
-            'name' => $project->name,
-            'slug' => $project->slug,
-            'description' => $project->description,
-            'created_at' => $project->created_at?->toIso8601String(),
-        ];
     }
 }

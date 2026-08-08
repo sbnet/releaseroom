@@ -7,6 +7,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -18,6 +19,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $created_at
  * @property Carbon|null $updated_at
  * @property-read User $owner
+ * @property-read RepositoryConnection|null $repositoryConnection
  */
 #[Fillable(['name', 'slug', 'description'])]
 class Project extends Model
@@ -68,5 +70,16 @@ class Project extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'user_id');
+    }
+
+    /**
+     * The GitHub repository this project reads its pull requests from, if one
+     * has been connected yet.
+     *
+     * @return HasOne<RepositoryConnection, $this>
+     */
+    public function repositoryConnection(): HasOne
+    {
+        return $this->hasOne(RepositoryConnection::class);
     }
 }

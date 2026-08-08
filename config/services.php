@@ -14,6 +14,17 @@ return [
     |
     */
 
+    'github' => [
+        'api_url' => env('GITHUB_API_URL', 'https://api.github.com'),
+
+        /*
+         * Repository verification runs inside a form submission: it has to
+         * fail fast rather than leave the owner waiting on a hung request.
+         */
+        'connect_timeout' => (int) env('GITHUB_CONNECT_TIMEOUT', 3),
+        'timeout' => (int) env('GITHUB_TIMEOUT', 5),
+    ],
+
     'postmark' => [
         'key' => env('POSTMARK_API_KEY'),
     ],
