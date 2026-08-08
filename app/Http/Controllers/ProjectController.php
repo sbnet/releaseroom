@@ -3,6 +3,7 @@
 namespace App\Http\Controllers;
 
 use App\Concerns\PresentsProjects;
+use App\Enums\CandidateState;
 use App\Http\Requests\ProjectStoreRequest;
 use App\Http\Requests\ProjectUpdateRequest;
 use App\Models\Project;
@@ -64,6 +65,9 @@ class ProjectController extends Controller
         return Inertia::render('projects/Show', [
             'project' => $this->projectPayload($project),
             'connection' => $this->connectionPayload($project->repositoryConnection),
+            'pending_count' => $project->pullRequestCandidates()
+                ->where('state', CandidateState::Pending)
+                ->count(),
         ]);
     }
 

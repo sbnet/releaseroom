@@ -4,9 +4,11 @@ namespace Database\Factories;
 
 use App\Enums\ConnectionFailure;
 use App\Enums\ConnectionStatus;
+use App\Enums\WebhookStatus;
 use App\Models\Project;
 use App\Models\RepositoryConnection;
 use Illuminate\Database\Eloquent\Factories\Factory;
+use Illuminate\Support\Str;
 
 /**
  * @extends Factory<RepositoryConnection>
@@ -41,7 +43,34 @@ class RepositoryConnectionFactory extends Factory
             'status' => ConnectionStatus::Connected,
             'last_error_code' => null,
             'last_checked_at' => now(),
+            'webhook_token' => Str::random(64),
+            'webhook_secret' => Str::random(64),
+            'webhook_id' => null,
+            'webhook_status' => WebhookStatus::ManualSetupRequired,
+            'webhook_last_delivery_at' => null,
+            'last_synced_at' => null,
         ];
+    }
+
+    /**
+     * A connection whose hook we created and which GitHub is delivering to.
+     */
+    public function withActiveWebhook(): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'webhook_id' => fake()->unique()->numberBetween(1, 999999999),
+            'webhook_status' => WebhookStatus::Active,
+        ]);
+    }
+
+    /**
+     * Pin the signing secret, so a test can sign a payload with it.
+     */
+    public function withWebhookSecret(string $secret): static
+    {
+        return $this->state(fn (array $attributes) => [
+            'webhook_secret' => $secret,
+        ]);
     }
 
     /**

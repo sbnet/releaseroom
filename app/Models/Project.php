@@ -4,9 +4,11 @@ namespace App\Models;
 
 use Database\Factories\ProjectFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
@@ -20,6 +22,7 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $updated_at
  * @property-read User $owner
  * @property-read RepositoryConnection|null $repositoryConnection
+ * @property-read Collection<int, PullRequestCandidate> $pullRequestCandidates
  */
 #[Fillable(['name', 'slug', 'description'])]
 class Project extends Model
@@ -81,5 +84,19 @@ class Project extends Model
     public function repositoryConnection(): HasOne
     {
         return $this->hasOne(RepositoryConnection::class);
+    }
+
+    /**
+     * The merged pull requests waiting to be turned into a changelog.
+     *
+     * These hang off the project rather than the connection on purpose:
+     * disconnecting a repository revokes a credential, and must not throw
+     * away the triage the owner has already done.
+     *
+     * @return HasMany<PullRequestCandidate, $this>
+     */
+    public function pullRequestCandidates(): HasMany
+    {
+        return $this->hasMany(PullRequestCandidate::class);
     }
 }

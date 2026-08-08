@@ -339,8 +339,15 @@ concurrently with a webhook delivery: the unique index arbitrates.
 
 A failed backfill or sync writes the same `status: failed` and mapped
 `last_error_code` that "Test connection" writes, and leaves the candidates it
-already ingested in place. The job retries three times with backoff before
-that verdict, which absorbs transient rate limits and blips.
+already ingested in place.
+
+**A refusal from GitHub is recorded, not retried.** Every mapped failure —
+including `rate_limited` — is already a considered verdict with a sentence
+telling the owner what to do, and "Sync now" is the retry. Silently requeuing
+would leave them watching an unchanged screen with no reason on it. The job's
+three attempts are reserved for infrastructure faults, which surface as
+exceptions rather than as an answer from GitHub. This keeps behavior identical
+on every queue driver, including the synchronous one the test suite uses.
 
 The tradeoff is stated openly: a rate limit hit during the backfill turns a
 repository that just connected successfully into a "Connection failed" badge
@@ -397,8 +404,13 @@ protected.
 | `POST`   | `/projects/{project}/candidates/{candidate}/dismiss` | `projects.candidates.dismiss` | Dismiss noise                        |
 | `POST`   | `/projects/{project}/candidates/{candidate}/restore` | `projects.candidates.restore` | Undo a dismissal                     |
 | `POST`   | `/projects/{project}/repository/sync`            | `projects.repository.sync`    | Fill gaps from the API                   |
-| `POST`   | `/projects/{project}/repository/webhook`         | `projects.repository.webhook` | Retry automatic hook creation            |
+| `POST`   | `/projects/{project}/repository/webhook`         | `projects.repository.webhook.store` | Retry automatic hook creation      |
 | `POST`   | `/projects/{project}/repository/webhook/secret`  | `projects.repository.webhook.secret` | Regenerate the signing secret     |
+
+Replacing the token through `PUT /projects/{project}/repository` also retries
+hook creation when live delivery is not active. A new token is the usual way
+out of `manual_setup_required`, so the attempt happens there rather than
+making the owner find the button afterwards.
 
 A candidate belonging to another project returns **404**, not 403 — the
 project in the URL is the authorization boundary, and a mismatched id is a
