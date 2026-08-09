@@ -98,40 +98,44 @@ async function copy(value: string, field: string): Promise<void> {
                 anything a delivery misses.
             </p>
 
-            <template v-else>
-                <p class="text-sm text-muted-foreground">
-                    ReleaseRoom could not create the webhook itself — usually
-                    because the stored token does not grant
-                    <span class="font-medium">Webhooks: Read and write</span>.
-                    Replace the token above and retry, or create the hook by
-                    hand with the settings below. Until then, pull requests only
-                    arrive when you sync.
-                </p>
+            <p v-else class="text-sm text-muted-foreground">
+                ReleaseRoom could not create the webhook itself — usually
+                because the stored token does not grant
+                <span class="font-medium">Webhooks: Read and write</span>.
+                Replace the token above and retry, or create the hook by hand
+                with the settings below. Until then, pull requests only arrive
+                when you sync.
+            </p>
 
-                <dl class="space-y-3 text-sm">
-                    <div class="space-y-1">
-                        <Label>Payload URL</Label>
-                        <div class="flex items-center gap-2">
-                            <code
-                                class="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 font-mono text-xs"
-                                data-test="webhook-url"
-                            >
-                                {{ props.connection.webhook_url }}
-                            </code>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                type="button"
-                                @click="
-                                    copy(props.connection.webhook_url, 'url')
-                                "
-                            >
-                                <Check v-if="copied === 'url'" />
-                                <Copy v-else />
-                            </Button>
-                        </div>
+            <dl class="space-y-3 text-sm">
+                <!--
+                    Shown in both states. When live delivery is active this is
+                    not an instruction but a reference: it is the value to
+                    compare against the hook on GitHub when deliveries go
+                    quiet, and the only place the owner can read it back.
+                -->
+                <div class="space-y-1">
+                    <Label>Payload URL</Label>
+                    <div class="flex items-center gap-2">
+                        <code
+                            class="min-w-0 flex-1 truncate rounded-md bg-muted px-2 py-1.5 font-mono text-xs"
+                            data-test="webhook-url"
+                        >
+                            {{ props.connection.webhook_url }}
+                        </code>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            type="button"
+                            @click="copy(props.connection.webhook_url, 'url')"
+                        >
+                            <Check v-if="copied === 'url'" />
+                            <Copy v-else />
+                        </Button>
                     </div>
+                </div>
 
+                <template v-if="!isActive">
                     <div class="space-y-1">
                         <Label>Secret</Label>
                         <div class="flex items-center gap-2">
@@ -166,16 +170,6 @@ async function copy(value: string, field: string): Promise<void> {
                         </div>
                     </div>
 
-                    <p
-                        v-if="copyFailed"
-                        class="text-xs text-muted-foreground"
-                        data-test="copy-unavailable"
-                    >
-                        Your browser would not let the page use the clipboard.
-                        The values are shown above — select and copy them by
-                        hand.
-                    </p>
-
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div class="space-y-1">
                             <dt class="text-muted-foreground">Content type</dt>
@@ -186,8 +180,20 @@ async function copy(value: string, field: string): Promise<void> {
                             <dd class="text-xs">Pull requests, only</dd>
                         </div>
                     </div>
-                </dl>
+                </template>
+            </dl>
 
+            <!-- Outside the manual branch: copying the URL can fail too. -->
+            <p
+                v-if="copyFailed"
+                class="text-xs text-muted-foreground"
+                data-test="copy-unavailable"
+            >
+                Your browser would not let the page use the clipboard. The
+                values are shown above — select and copy them by hand.
+            </p>
+
+            <template v-if="!isActive">
                 <div class="flex flex-wrap items-center gap-2">
                     <Form
                         v-bind="

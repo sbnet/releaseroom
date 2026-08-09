@@ -180,6 +180,25 @@ it('keeps two connections to the same public repository apart', function () {
     expect($otherProject->pullRequestCandidates()->count())->toBe(1);
 });
 
+it('takes the delivery log with the connection, and leaves the candidates', function () {
+    $this->deliver($this->connection, $this->mergeEvent(
+        $this->githubPullRequest(['number' => 7]),
+    ))->assertStatus(202);
+
+    expect(WebhookDelivery::query()->count())->toBe(1)
+        ->and(PullRequestCandidate::query()->count())->toBe(1);
+
+    $this->connection->delete();
+
+    /*
+     * The log belongs to the connection and is worthless without it. The
+     * candidates belong to the project: disconnecting revokes a credential,
+     * it does not throw away the owner's triage.
+     */
+    expect(WebhookDelivery::query()->count())->toBe(0)
+        ->and(PullRequestCandidate::query()->count())->toBe(1);
+});
+
 it('refuses a delivery signed with the other connection\'s secret', function () {
     $otherOwner = User::factory()->create();
     $otherProject = Project::factory()->for($otherOwner, 'owner')->create();

@@ -136,7 +136,9 @@ Index: `unique(repository_connection_id, delivery_id)` — GitHub retries a
 failed delivery with the same id, and the unique index is what makes the
 retry a no-op instead of a duplicate.
 
-The model is `Prunable`, dropping rows older than 30 days. Nothing schedules
+The model is `MassPrunable`, dropping rows older than 30 days in bulk rather
+than one at a time — nothing observes this table, so there are no model events
+worth firing per row. Nothing schedules
 `model:prune` in this slice; see Open questions.
 
 ### Additions to `repository_connections`
@@ -568,7 +570,7 @@ the second is only needed for automatic setup.
 | Hook creation           | Automatic, falling back to manual                   | Costs a broader token permission and two code paths; buys a zero-step setup for most owners without stranding those who will not grant it.     |
 | Endpoint identity       | Per-connection opaque URL + per-connection secret    | Two users may connect the same public repository, so the repository id cannot identify a connection. The URL does, unambiguously, with no fan-out. |
 | Delivery handling       | Persist, ack 202, process in a queued job           | GitHub's ~10s budget is never at risk, retries are idempotent by delivery id, and "why did this PR never appear" is answerable.                 |
-| Delivery log retention  | Prunable, 30 days                                   | Long enough to debug an incident, short enough that the table is not a payload archive. Needs a scheduler, which this slice does not add.       |
+| Delivery log retention  | MassPrunable, 30 days                               | Long enough to debug an incident, short enough that the table is not a payload archive. Needs a scheduler, which this slice does not add.       |
 | Dedup key               | `unique(project_id, github_id)`                     | One database-level guarantee serving three ingestion paths. No read-then-write race anywhere.                                                    |
 | Candidate ownership     | The project, not the connection                     | Disconnect is the escape hatch from repointing; it must not destroy triage work. Cost: reconnecting a different repository merges the lists.    |
 | Freeze rule             | `curated_at` null ⇒ track GitHub                    | Late typo fixes flow through, human rulings never get overwritten. Cost: a restored entry stops tracking upstream edits.                        |
