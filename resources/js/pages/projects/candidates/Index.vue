@@ -200,8 +200,13 @@ const tabs = computed(() => [
                     <template
                         v-if="props.connection?.webhook_status !== 'active'"
                     >
-                        Live delivery is not set up yet, so nothing will arrive
-                        on its own.
+                        <Link
+                            :href="repository(props.project.id)"
+                            class="underline underline-offset-4"
+                            data-test="webhook-setup-link"
+                        >
+                            Live delivery is not set up yet</Link
+                        >, so nothing will arrive on its own.
                     </template>
                 </p>
             </div>

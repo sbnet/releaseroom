@@ -39,6 +39,26 @@ const isWebhookActive = computed(
     () => props.connection?.webhook_status === 'active',
 );
 
+/**
+ * When GitHub last reached us. Shown next to "Active" because "the hook
+ * exists" and "the hook is still delivering" are different claims, and only
+ * the second one is worth anything — a hook deleted on GitHub goes quiet
+ * without telling us, and this timestamp is the symptom.
+ */
+const lastDelivery = computed(() =>
+    props.connection?.webhook_last_delivery_at
+        ? toRelativeTime(props.connection.webhook_last_delivery_at)
+        : null,
+);
+
+/* One interpolation rather than a nested template, so the spacing around the
+ * separator does not depend on how the compiler condenses whitespace. */
+const liveDeliveryLabel = computed(() =>
+    lastDelivery.value === null
+        ? 'Active'
+        : `Active · last ${lastDelivery.value}`,
+);
+
 const pendingLabel = computed(() => {
     if (props.pendingCount === 0) {
         return 'No pull requests pending';
@@ -147,7 +167,9 @@ const pendingLabel = computed(() => {
                                     : 'text-amber-500'
                             "
                         />
-                        <template v-if="isWebhookActive">Active</template>
+                        <span v-if="isWebhookActive" data-allow-mismatch="text">
+                            {{ liveDeliveryLabel }}
+                        </span>
                         <Link
                             v-else
                             :href="edit(props.project.id)"
