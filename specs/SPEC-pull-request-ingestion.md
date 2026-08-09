@@ -716,9 +716,12 @@ Screen payloads are asserted on Inertia props, per the existing convention.
 
 **Ingesting**
 
-13. A pull request merged into the default branch appears in the project's
-    pending list with its number, title, body, author, labels, merge time and
-    GitHub link.
+13. A pull request merged into the default branch is stored with its number,
+    title, body, author, labels, merge time and GitHub link, and appears in
+    the project's pending list showing its number, title, author, labels,
+    merge time and GitHub link. The list is for triage, not reading: the body
+    is not one of the row's fields, and the GitHub link is how the full text
+    is reached.
 14. A pull request merged into any other branch does not appear.
 15. A pull request closed without merging does not appear.
 16. Connecting a repository backfills up to 100 recently merged pull
