@@ -38,14 +38,27 @@ return new class extends Migration
          * and a secret here, sit at `manual_setup_required`, and keep working
          * for backfill and sync, which need only pull request read access.
          */
-        foreach (DB::table('repository_connections')->select('id')->get() as $connection) {
+        /*
+         * A row at a time, because each one needs its own token and its own
+         * secret — there is no set-based form of "give everybody a different
+         * random value". Wrapped in a transaction so a deploy pays for one
+         * commit rather than one per connection.
+         */
+        DB::transaction(function () {
             DB::table('repository_connections')
-                ->where('id', $connection->id)
-                ->update([
-                    'webhook_token' => Str::random(64),
-                    'webhook_secret' => Crypt::encryptString(Str::random(64)),
-                ]);
-        }
+                ->select('id')
+                ->orderBy('id')
+                ->chunk(500, function ($connections) {
+                    foreach ($connections as $connection) {
+                        DB::table('repository_connections')
+                            ->where('id', $connection->id)
+                            ->update([
+                                'webhook_token' => Str::random(64),
+                                'webhook_secret' => Crypt::encryptString(Str::random(64)),
+                            ]);
+                    }
+                });
+        });
 
         Schema::table('repository_connections', function (Blueprint $table) {
             $table->string('webhook_token', 64)->nullable(false)->change();

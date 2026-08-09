@@ -13,6 +13,11 @@ const props = defineProps<{
     candidate: PullRequestCandidate;
 }>();
 
+/*
+ * Rendered on the server and again on hydration, a beat later, so the two can
+ * legitimately disagree by a minute. The markup marks that mismatch as
+ * expected rather than letting Vue report it as a hydration failure.
+ */
 const merged = computed(() => toRelativeTime(props.candidate.merged_at));
 
 const isPending = computed(() => props.candidate.state === 'pending');
@@ -73,7 +78,8 @@ const action = computed(() =>
                     />
                     {{ props.candidate.author_login }}
                 </span>
-                <span>merged {{ merged }}</span>
+                <!-- Server and client compute this moments apart; see below. -->
+                <span data-allow-mismatch="text">merged {{ merged }}</span>
             </div>
 
             <div

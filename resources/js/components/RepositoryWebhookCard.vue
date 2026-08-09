@@ -18,6 +18,7 @@ const props = defineProps<{
 
 const revealed = ref(false);
 const copied = ref<string | null>(null);
+const copyFailed = ref(false);
 
 const isActive = computed(() => props.connection.webhook_status === 'active');
 
@@ -31,8 +32,26 @@ const hookSettingsUrl = computed(
     () => `${props.connection.url}/settings/hooks`,
 );
 
+/**
+ * Copy, and cope with not being allowed to.
+ *
+ * `navigator.clipboard` is unavailable in an insecure context and the browser
+ * may refuse permission outright. Left unhandled the rejection surfaces as a
+ * Vue error with nothing on screen to explain it — on the one screen whose
+ * whole purpose is getting two values out of the app and into GitHub. Falling
+ * back to revealing the secret lets the owner select it by hand.
+ */
 async function copy(value: string, field: string): Promise<void> {
-    await navigator.clipboard.writeText(value);
+    try {
+        await navigator.clipboard.writeText(value);
+    } catch {
+        copyFailed.value = true;
+        revealed.value = true;
+
+        return;
+    }
+
+    copyFailed.value = false;
     copied.value = field;
     setTimeout(() => (copied.value = null), 1500);
 }
@@ -57,7 +76,17 @@ async function copy(value: string, field: string): Promise<void> {
                     <Zap v-if="isActive" />
                     {{ isActive ? 'Active' : 'Manual setup required' }}
                 </Badge>
-                <span v-if="lastDelivery" class="text-sm text-muted-foreground">
+                <!--
+                    A relative time is computed on the server and again in the
+                    browser, moments apart, so "11 minutes ago" legitimately
+                    becomes "12 minutes ago" between the two. The mismatch is
+                    expected here rather than a symptom of anything.
+                -->
+                <span
+                    v-if="lastDelivery"
+                    class="text-sm text-muted-foreground"
+                    data-allow-mismatch="text"
+                >
                     Last delivery {{ lastDelivery }}
                 </span>
             </div>
@@ -136,6 +165,16 @@ async function copy(value: string, field: string): Promise<void> {
                             </Button>
                         </div>
                     </div>
+
+                    <p
+                        v-if="copyFailed"
+                        class="text-xs text-muted-foreground"
+                        data-test="copy-unavailable"
+                    >
+                        Your browser would not let the page use the clipboard.
+                        The values are shown above — select and copy them by
+                        hand.
+                    </p>
 
                     <div class="grid gap-3 sm:grid-cols-2">
                         <div class="space-y-1">

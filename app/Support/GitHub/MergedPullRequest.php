@@ -21,6 +21,11 @@ class MergedPullRequest
     /**
      * A changelog entry needs a paragraph, not a novel. The link back to
      * GitHub is always there for the full text.
+     *
+     * Counted in **bytes**, not characters: a `text` column holds 65,535
+     * bytes on MySQL, and a body full of emoji or CJK cut to 65,535
+     * *characters* would still be refused by it. SQLite, which development and
+     * the test suite run on, has no such ceiling and would never show it.
      */
     private const BODY_LIMIT = 65535;
 
@@ -83,7 +88,8 @@ class MergedPullRequest
             githubId: $githubId,
             number: $number,
             title: mb_substr($title, 0, self::TITLE_LIMIT),
-            body: $body === null ? null : mb_substr($body, 0, self::BODY_LIMIT),
+            /* mb_strcut cuts on a byte budget without splitting a character. */
+            body: $body === null ? null : mb_strcut($body, 0, self::BODY_LIMIT),
             authorLogin: is_string($user['login'] ?? null) ? $user['login'] : null,
             authorAvatarUrl: is_string($user['avatar_url'] ?? null) ? $user['avatar_url'] : null,
             labels: self::labelsFrom($payload['labels'] ?? null),

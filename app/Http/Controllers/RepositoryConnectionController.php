@@ -129,14 +129,24 @@ class RepositoryConnectionController extends Controller
 
         $repointed = $verified->githubId !== $connection->github_id;
 
+        /*
+         * The hook lives on the old repository and would keep delivering its
+         * merges, so it has to go — but only once the repointing is certain.
+         * `persist()` can still lose a race to the unique index and refuse the
+         * whole update, and deleting first would leave that owner with an
+         * unchanged connection whose hook no longer exists on GitHub.
+         *
+         * A clone keeps the old address, the old token and the old hook id,
+         * all of which the deletion needs and all of which are about to be
+         * overwritten. Eloquent's attributes are a plain array, so the copy is
+         * unaffected by what follows.
+         */
+        $previous = null;
+
         if ($repointed) {
             $this->guardAgainstRepointing($project);
 
-            /*
-             * The hook lives on the old repository and would keep delivering
-             * its merges. Removed before the connection forgets where it was.
-             */
-            $this->webhooks->delete($connection);
+            $previous = clone $connection;
             $connection->generateWebhookCredentials();
         }
 
@@ -146,6 +156,10 @@ class RepositoryConnectionController extends Controller
 
         $this->applyVerification($connection, $verified);
         $this->persist($project, $connection);
+
+        if ($previous !== null) {
+            $this->webhooks->delete($previous);
+        }
 
         /*
          * A replaced token is the usual way out of `manual_setup_required`,

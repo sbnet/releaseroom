@@ -130,7 +130,8 @@ const pendingLabel = computed(() => {
                 </div>
                 <div class="space-y-1">
                     <dt class="text-muted-foreground">Last checked</dt>
-                    <dd>{{ lastChecked }}</dd>
+                    <!-- Relative time: rendered twice, a beat apart. -->
+                    <dd data-allow-mismatch="text">{{ lastChecked }}</dd>
                 </div>
                 <div class="space-y-1">
                     <dt class="text-muted-foreground">Live delivery</dt>
@@ -158,7 +159,9 @@ const pendingLabel = computed(() => {
                 </div>
                 <div class="space-y-1">
                     <dt class="text-muted-foreground">Last synced</dt>
-                    <dd data-test="last-synced">{{ lastSynced ?? 'Never' }}</dd>
+                    <dd data-test="last-synced" data-allow-mismatch="text">
+                        {{ lastSynced ?? 'Never' }}
+                    </dd>
                 </div>
             </dl>
 

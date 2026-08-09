@@ -65,7 +65,19 @@ it('treats absent labels as none', function () {
 it('truncates a body far longer than any changelog needs', function () {
     $pull = MergedPullRequest::fromPayload(payload(['body' => str_repeat('a', 70_000)]));
 
-    expect($pull->body)->toHaveLength(65_535);
+    expect(strlen($pull->body))->toBe(65_535);
+});
+
+it('truncates a multi-byte body to a byte budget, not a character count', function () {
+    /*
+     * 30,000 four-byte characters is 120,000 bytes. Cutting to 65,535
+     * *characters* would leave something a MySQL `text` column refuses.
+     */
+    $pull = MergedPullRequest::fromPayload(payload(['body' => str_repeat('🚀', 30_000)]));
+
+    expect(strlen($pull->body))->toBeLessThanOrEqual(65_535)
+        /* And it is still valid UTF-8: no character was cut in half. */
+        ->and(mb_check_encoding($pull->body, 'UTF-8'))->toBeTrue();
 });
 
 it('truncates an implausibly long title', function () {

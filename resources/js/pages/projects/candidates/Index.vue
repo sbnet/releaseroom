@@ -120,7 +120,12 @@ const tabs = computed(() => [
             </div>
         </div>
 
-        <p v-if="lastSynced" class="-mt-2 text-sm text-muted-foreground">
+        <!-- Relative time: server and client disagree by design, see the row. -->
+        <p
+            v-if="lastSynced"
+            class="-mt-2 text-sm text-muted-foreground"
+            data-allow-mismatch="text"
+        >
             Last synced {{ lastSynced }}.
         </p>
 

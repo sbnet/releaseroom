@@ -20,6 +20,13 @@ Route::middleware(['auth', 'verified'])->group(function () {
      *
      * The write routes are throttled because each one spends the token's
      * GitHub quota, and they are the only way to spend it from outside.
+     *
+     * Note that `throttle:10,1` keys on the authenticated user alone, not on
+     * the route or the project: the ten calls a minute are shared across every
+     * project an owner has and across all of these actions. The URL reads as
+     * though it were per project and is not. That is deliberate — the quota
+     * being protected belongs to the tokens, which belong to the user — but it
+     * is not what the address suggests, so it is written down here.
      */
     Route::prefix('projects/{project}/repository')
         ->name('projects.repository.')

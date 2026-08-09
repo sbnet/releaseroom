@@ -170,6 +170,49 @@ it('never overwrites a pull request the owner has ruled on', function () {
         ->state->toBe(CandidateState::Pending);
 });
 
+it('explains an edit to a pull request that is not merged', function () {
+    $this->deliver($this->connection, $this->mergeEvent(
+        $this->githubPullRequest(['merged_at' => null]),
+        action: 'edited',
+    ))->assertStatus(202);
+
+    expect(WebhookDelivery::query()->firstOrFail())
+        ->status->toBe(DeliveryStatus::Ignored)
+        /* Not "closed without merging": editing an open one is routine. */
+        ->reason->toBe('Edited, but not merged.');
+});
+
+it('refreshes the author of a pending pull request, and freezes it once ruled on', function () {
+    $this->deliver($this->connection, $this->mergeEvent(
+        $this->githubPullRequest(['number' => 7]),
+    ))->assertStatus(202);
+
+    $renamed = $this->githubPullRequest([
+        'number' => 7,
+        'user' => ['login' => 'octocat-renamed', 'avatar_url' => 'https://example.test/new.png'],
+    ]);
+
+    $this->deliver($this->connection, $this->mergeEvent($renamed, action: 'edited'))
+        ->assertStatus(202);
+
+    $candidate = PullRequestCandidate::query()->firstOrFail();
+
+    expect($candidate->author_login)->toBe('octocat-renamed');
+
+    $this->actingAs($this->owner)
+        ->post("/projects/{$this->project->id}/candidates/{$candidate->id}/dismiss");
+
+    $this->deliver($this->connection, $this->mergeEvent(
+        $this->githubPullRequest([
+            'number' => 7,
+            'user' => ['login' => 'someone-else', 'avatar_url' => 'https://example.test/x.png'],
+        ]),
+        action: 'edited',
+    ))->assertStatus(202);
+
+    expect($candidate->fresh()->author_login)->toBe('octocat-renamed');
+});
+
 it('does not create a candidate from an edit it never ingested', function () {
     $this->deliver($this->connection, $this->mergeEvent(
         $this->githubPullRequest(['number' => 7]),

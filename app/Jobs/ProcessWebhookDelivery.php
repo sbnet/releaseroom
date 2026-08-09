@@ -72,7 +72,17 @@ class ProcessWebhookDelivery implements ShouldQueue
         $pull = is_array($payload) ? MergedPullRequest::fromPayload($payload) : null;
 
         if ($pull === null) {
-            $delivery->resolve(DeliveryStatus::Ignored, 'Closed without merging.');
+            /*
+             * Both actions reach here with no merge date, for opposite
+             * reasons: a `closed` one was abandoned, an `edited` one is very
+             * likely still open — editing an open pull request's title is
+             * routine. Saying "closed without merging" for the second would
+             * mislead exactly the person reading this log to find out why
+             * their pull request never appeared.
+             */
+            $delivery->resolve(DeliveryStatus::Ignored, $delivery->action === 'edited'
+                ? 'Edited, but not merged.'
+                : 'Closed without merging.');
 
             return;
         }

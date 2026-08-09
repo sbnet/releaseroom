@@ -1,9 +1,12 @@
 <?php
 
+use App\Enums\WebhookStatus;
 use App\Models\Project;
 use App\Models\PullRequestCandidate;
 use App\Models\RepositoryConnection;
 use App\Models\User;
+use Illuminate\Http\Client\Request;
+use Illuminate\Support\Facades\Http;
 use Tests\Concerns\FakesGitHub;
 
 uses(FakesGitHub::class);
@@ -116,6 +119,106 @@ it('leaves the candidates alone when a repointing is refused', function () {
         ->assertSessionHasErrors('repository_url');
 
     expect($this->project->pullRequestCandidates()->count())->toBe(3);
+});
+
+it('keeps the hook when the pre-check refuses a repoint', function () {
+    /*
+     * The owner already reads acme/other from another project, so the
+     * pre-check refuses this repoint. Nothing about the old connection —
+     * least of all its live hook on GitHub — may be touched on the way out.
+     */
+    $rival = Project::factory()->for($this->owner, 'owner')->create();
+    RepositoryConnection::factory()->forProject($rival)->create(['github_id' => 999999]);
+
+    $this->connection->webhook_id = 4242;
+    $this->connection->webhook_status = WebhookStatus::Active;
+    $this->connection->save();
+
+    $this->fakeGitHub(['id' => 999999, 'full_name' => 'acme/other']);
+
+    $this->actingAs($this->owner)
+        ->put("/projects/{$this->project->id}/repository", [
+            'repository_url' => 'https://github.com/acme/other',
+            'token' => 'github_pat_valid_token_value',
+        ])
+        ->assertSessionHasErrors('repository_url');
+
+    Http::assertNotSent(fn (Request $request) => $request->method() === 'DELETE');
+
+    expect($this->connection->fresh())
+        ->github_id->toBe(123456)
+        ->webhook_id->toBe(4242)
+        ->webhook_status->toBe(WebhookStatus::Active);
+});
+
+it('keeps the hook when a repoint loses the race to the unique index', function () {
+    /*
+     * The genuine lost race, which the pre-checks cannot see: a competing
+     * connection to the same repository lands after they have run and before
+     * this one is written, so the unique index is what refuses it.
+     *
+     * The old hook must still be on GitHub afterwards. Deleting it first would
+     * leave this owner with an unchanged connection pointing at a hook that no
+     * longer exists — and nothing on screen would say so.
+     */
+    $rival = Project::factory()->for($this->owner, 'owner')->create(['name' => 'Acme Website']);
+
+    $landed = false;
+
+    RepositoryConnection::saving(function () use (&$landed, $rival) {
+        if ($landed) {
+            return;
+        }
+
+        $landed = true;
+
+        RepositoryConnection::factory()->forProject($rival)->create(['github_id' => 999999]);
+    });
+
+    $this->connection->webhook_id = 4242;
+    $this->connection->webhook_status = WebhookStatus::Active;
+    $this->connection->saveQuietly();
+
+    $this->fakeGitHub(['id' => 999999, 'full_name' => 'acme/other']);
+
+    $this->actingAs($this->owner)
+        ->put("/projects/{$this->project->id}/repository", [
+            'repository_url' => 'https://github.com/acme/other',
+            'token' => 'github_pat_valid_token_value',
+        ])
+        ->assertSessionHasErrors([
+            'repository_url' => 'This repository is already connected to Acme Website.',
+        ]);
+
+    Http::assertNotSent(fn (Request $request) => $request->method() === 'DELETE');
+
+    expect($this->connection->fresh())
+        ->github_id->toBe(123456)
+        ->webhook_id->toBe(4242)
+        ->webhook_status->toBe(WebhookStatus::Active);
+});
+
+it('removes the old hook only once a repoint has actually been written', function () {
+    $this->connection->webhook_id = 4242;
+    $this->connection->webhook_status = WebhookStatus::Active;
+    $this->connection->save();
+
+    $this->fakeGitHub(['id' => 999999, 'full_name' => 'acme/other']);
+
+    $this->actingAs($this->owner)
+        ->put("/projects/{$this->project->id}/repository", [
+            'repository_url' => 'https://github.com/acme/other',
+            'token' => 'github_pat_valid_token_value',
+        ])
+        ->assertSessionHasNoErrors();
+
+    /* Deleted from the repository it used to watch, not the new one. */
+    Http::assertSent(fn (Request $request) => $request->method() === 'DELETE'
+        && str_contains($request->url(), '/repos/acme/platform/hooks/4242'));
+
+    expect($this->connection->fresh())
+        ->github_id->toBe(999999)
+        ->webhook_id->toBeNull();
 });
 
 it('tells the repository screen how many pull requests are in the way', function () {
