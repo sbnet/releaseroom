@@ -86,6 +86,22 @@ it('truncates an implausibly long title', function () {
     expect($pull->title)->toHaveLength(512);
 });
 
+it('truncates the remaining string fields to their column widths', function () {
+    $pull = MergedPullRequest::fromPayload(payload([
+        'user' => [
+            'login' => str_repeat('a', 100),
+            'avatar_url' => 'https://example.test/'.str_repeat('a', 300),
+        ],
+        'base' => ['ref' => str_repeat('b', 300)],
+        'html_url' => 'https://example.test/'.str_repeat('c', 300),
+    ]));
+
+    expect($pull->authorLogin)->toHaveLength(39)
+        ->and($pull->authorAvatarUrl)->toHaveLength(255)
+        ->and($pull->baseBranch)->toHaveLength(255)
+        ->and($pull->htmlUrl)->toHaveLength(255);
+});
+
 it('accepts a missing body', function () {
     expect(MergedPullRequest::fromPayload(payload(['body' => null]))->body)->toBeNull();
 });

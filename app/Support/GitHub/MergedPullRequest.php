@@ -30,6 +30,22 @@ class MergedPullRequest
     private const BODY_LIMIT = 65535;
 
     /**
+     * The widths of the remaining string columns.
+     *
+     * GitHub's own values sit far below these, so nothing here is expected to
+     * bite. They are cut anyway for the same reason the body is: SQLite, which
+     * development and the suite run on, ignores a declared width entirely, so
+     * an over-long value would sail through every test and only surface as a
+     * length error against the production engine. Degrading a stored value
+     * beats refusing the whole ingestion.
+     */
+    private const LOGIN_LIMIT = 39;
+
+    private const URL_LIMIT = 255;
+
+    private const BRANCH_LIMIT = 255;
+
+    /**
      * @param  list<string>  $labels
      */
     public function __construct(
@@ -83,6 +99,9 @@ class MergedPullRequest
 
         $title = is_string($payload['title'] ?? null) ? $payload['title'] : '';
         $body = is_string($payload['body'] ?? null) ? $payload['body'] : null;
+        $authorLogin = is_string($user['login'] ?? null) ? $user['login'] : null;
+        $authorAvatarUrl = is_string($user['avatar_url'] ?? null) ? $user['avatar_url'] : null;
+        $htmlUrl = is_string($payload['html_url'] ?? null) ? $payload['html_url'] : '';
 
         return new self(
             githubId: $githubId,
@@ -90,12 +109,12 @@ class MergedPullRequest
             title: mb_substr($title, 0, self::TITLE_LIMIT),
             /* mb_strcut cuts on a byte budget without splitting a character. */
             body: $body === null ? null : mb_strcut($body, 0, self::BODY_LIMIT),
-            authorLogin: is_string($user['login'] ?? null) ? $user['login'] : null,
-            authorAvatarUrl: is_string($user['avatar_url'] ?? null) ? $user['avatar_url'] : null,
+            authorLogin: $authorLogin === null ? null : mb_substr($authorLogin, 0, self::LOGIN_LIMIT),
+            authorAvatarUrl: $authorAvatarUrl === null ? null : mb_substr($authorAvatarUrl, 0, self::URL_LIMIT),
             labels: self::labelsFrom($payload['labels'] ?? null),
-            baseBranch: $baseBranch,
+            baseBranch: mb_substr($baseBranch, 0, self::BRANCH_LIMIT),
             mergedAt: $merged,
-            htmlUrl: is_string($payload['html_url'] ?? null) ? $payload['html_url'] : '',
+            htmlUrl: mb_substr($htmlUrl, 0, self::URL_LIMIT),
         );
     }
 

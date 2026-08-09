@@ -6,6 +6,7 @@ use App\Enums\ConnectionStatus;
 use App\Enums\IngestionSource;
 use App\Exceptions\RepositoryVerificationException;
 use App\Models\RepositoryConnection;
+use App\Services\GitHub\GitHubClient;
 use App\Services\GitHub\PullRequestFetcher;
 use Illuminate\Contracts\Queue\ShouldQueue;
 use Illuminate\Foundation\Queue\Queueable;
@@ -22,10 +23,19 @@ class ImportPullRequests implements ShouldQueue
     use Queueable;
 
     /**
-     * Infrastructure blips are worth retrying. A refusal from GitHub is not:
-     * it is already a considered verdict, and it is recorded rather than
-     * retried so that the owner sees the reason instead of a job quietly
-     * spinning behind an unchanged screen.
+     * A last resort, and nothing more.
+     *
+     * Everything this job can anticipate — a refusal, a rate limit, GitHub
+     * being unreachable — arrives as a {@see RepositoryVerificationException},
+     * because {@see GitHubClient} maps even a transport failure to
+     * `github_unavailable`. All of it is caught below and
+     * recorded, never retried: each one is already a considered verdict with a
+     * sentence for the owner, and "Sync now" is the retry. Behaving the same
+     * way on every queue driver, the synchronous one included, matters more
+     * here than shaving a minute off a transient outage.
+     *
+     * So these three attempts only ever cover what the import path does not
+     * anticipate at all — a database that went away mid-write, say.
      */
     public int $tries = 3;
 
