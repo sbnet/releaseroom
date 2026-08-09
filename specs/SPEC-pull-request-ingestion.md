@@ -1,7 +1,7 @@
 ---
 ref: pull-request-ingestion
 title: "Merged pull request ingestion"
-status: validated
+status: implemented
 issue: 6
 date: 2026-08-08
 ---
