@@ -10,6 +10,7 @@ import type { Project, RepositoryConnection } from '@/types';
 const props = defineProps<{
     project: Project;
     connection: RepositoryConnection | null;
+    pending_count: number;
 }>();
 
 defineOptions({
@@ -69,6 +70,7 @@ const createdAt = computed(() =>
         <RepositoryConnectionCard
             :project="props.project"
             :connection="props.connection"
+            :pending-count="props.pending_count"
         />
 
         <div

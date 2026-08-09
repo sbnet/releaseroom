@@ -3,6 +3,7 @@
 namespace App\Concerns;
 
 use App\Models\Project;
+use App\Models\PullRequestCandidate;
 use App\Models\RepositoryConnection;
 
 /**
@@ -57,6 +58,31 @@ trait PresentsProjects
             'error_message' => $connection->last_error_code?->message(),
             'last_checked_at' => $connection->last_checked_at->toIso8601String(),
             'created_at' => $connection->created_at?->toIso8601String(),
+            'webhook_status' => $connection->webhook_status->value,
+            'webhook_url' => $connection->webhookUrl(),
+            'webhook_last_delivery_at' => $connection->webhook_last_delivery_at?->toIso8601String(),
+            'manages_hook' => $connection->managesHook(),
+            'last_synced_at' => $connection->last_synced_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Shape a merged pull request awaiting curation.
+     *
+     * @return array<string, mixed>
+     */
+    protected function candidatePayload(PullRequestCandidate $candidate): array
+    {
+        return [
+            'id' => $candidate->id,
+            'number' => $candidate->number,
+            'title' => $candidate->title,
+            'author_login' => $candidate->author_login,
+            'author_avatar_url' => $candidate->author_avatar_url,
+            'labels' => $candidate->labels,
+            'merged_at' => $candidate->merged_at->toIso8601String(),
+            'html_url' => $candidate->html_url,
+            'state' => $candidate->state->value,
         ];
     }
 }
