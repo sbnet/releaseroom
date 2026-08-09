@@ -47,25 +47,32 @@ const lastSynced = computed(() =>
 const total = computed(() => props.counts.pending + props.counts.dismissed);
 
 /**
- * Four different situations produce an empty list, and they need four
- * different sentences: there is nothing to read from, there is something to
- * read from but it has not been read yet, it has been read and found nothing,
- * or everything has already been triaged.
+ * Five different situations produce an empty list, and they need five
+ * different sentences: there is nothing to read from, reading it failed,
+ * there is something to read from but it has not been read yet, it has been
+ * read and found nothing, or everything has already been triaged.
+ *
+ * The failed case has to come first. `last_synced_at` is only ever written on
+ * a successful import, so a backfill that died — a rate limit right after
+ * connecting, say — leaves it null forever, and "still importing" would be a
+ * promise this page could never keep.
  */
 const emptyState = computed(() => {
     if (props.connection === null) {
         return 'disconnected';
     }
 
-    if (total.value === 0 && props.connection.last_synced_at === null) {
-        return 'importing';
+    if (total.value > 0) {
+        return 'triaged';
     }
 
-    if (total.value === 0) {
-        return 'nothing-ingested';
+    if (props.connection.status === 'failed') {
+        return 'failed';
     }
 
-    return 'triaged';
+    return props.connection.last_synced_at === null
+        ? 'importing'
+        : 'nothing-ingested';
 });
 
 const tabs = computed(() => [
@@ -177,6 +184,19 @@ const tabs = computed(() => [
                 </p>
             </div>
 
+            <div class="space-y-1" v-else-if="emptyState === 'failed'">
+                <p class="font-medium">Could not import pull requests</p>
+                <p
+                    class="max-w-md text-sm text-destructive"
+                    data-test="import-failed-reason"
+                >
+                    {{
+                        props.connection?.error_message ??
+                        'GitHub refused the last import.'
+                    }}
+                </p>
+            </div>
+
             <div class="space-y-1" v-else-if="emptyState === 'importing'">
                 <p class="font-medium">Importing pull requests</p>
                 <p class="max-w-md text-sm text-muted-foreground">
@@ -234,6 +254,37 @@ const tabs = computed(() => [
                     Connect a repository
                 </Link>
             </Button>
+
+            <!-- The reason is on screen; so is the way to act on it. -->
+            <div
+                v-else-if="emptyState === 'failed'"
+                class="flex flex-wrap items-center justify-center gap-2"
+            >
+                <Form
+                    v-bind="
+                        RepositoryConnectionController.sync.form(
+                            props.project.id,
+                        )
+                    "
+                    :options="{ preserveScroll: true }"
+                    v-slot="{ processing }"
+                >
+                    <Button
+                        type="submit"
+                        :disabled="processing"
+                        data-test="retry-import-button"
+                    >
+                        <RefreshCw :class="processing ? 'animate-spin' : ''" />
+                        Try again
+                    </Button>
+                </Form>
+
+                <Button variant="outline" as-child>
+                    <Link :href="repository(props.project.id)">
+                        Repository settings
+                    </Link>
+                </Button>
+            </div>
         </div>
 
         <nav

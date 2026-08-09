@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\CandidateState;
+use App\Enums\ConnectionFailure;
 use App\Models\Project;
 use App\Models\PullRequestCandidate;
 use App\Models\RepositoryConnection;
@@ -121,6 +122,27 @@ it('shows the pending count on the project page', function () {
     $this->actingAs($this->owner)
         ->get("/projects/{$this->project->id}")
         ->assertInertia(fn ($page) => $page->where('pending_count', 3));
+});
+
+it('tells the curation list that an import failed, and why', function () {
+    /*
+     * The page distinguishes "still importing" from "the import died" using
+     * these two fields. `last_synced_at` cannot do it alone: it is only ever
+     * written on success, so a failed backfill leaves it null forever and the
+     * page would promise an import that is never coming.
+     */
+    RepositoryConnection::factory()
+        ->forProject($this->project)
+        ->failed(ConnectionFailure::RateLimited)
+        ->create(['last_synced_at' => null]);
+
+    $this->actingAs($this->owner)
+        ->get("/projects/{$this->project->id}/candidates")
+        ->assertInertia(fn ($page) => $page
+            ->has('candidates.data', 0)
+            ->where('connection.status', 'failed')
+            ->where('connection.last_synced_at', null)
+            ->where('connection.error_message', ConnectionFailure::RateLimited->message()));
 });
 
 it('keeps a project\'s candidates when its repository is disconnected', function () {
